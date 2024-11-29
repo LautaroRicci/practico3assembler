@@ -216,7 +216,58 @@ jr $ra
 # FUNCION ELIMINAR CATEGORIA
 #
 delcategory:
+	addiu $sp, $sp, -4
+	sw $ra, 4($sp)		#stack pointer
+	
+	lw $t0, wclist
+	beqz $t0, err401	# no categories print error 401
+	
+	lw $t0, 4($t0)		# pointer to object list
+	beqz $t0, del_empty_cat	# empty cat delete
+	
+	lw $t1, wclist
+	la $a1, 4($t1)
+	jal del_objects_loop	# delete all objects and then category
+	
+	lw $ra, 4($sp)
+	addiu $sp, $sp, 4
+	jr $ra
+	
+	
+del_objects_loop: 
+	lw $t3, 12($t0)		# next node pointer
+	add $a0, $0, $t0	# $a0 argument for delnode
+	jal delnode
+	move $t0, $t3		# move $t3 to $t0
+	beq $a0, $t0, end_del_objects
+	j del_objects_loop
 
+end_del_objects:
+    	j del_empty_cat          
+
+del_empty_cat:
+	lw $a0, wclist	# deleted category pointer
+   	la $a1, cclist 	# pointer to list 
+   	lw $t0, 12($a0)	
+   	sw $t0, wclist     
+	jal delnode
+	
+	print_label(success)
+	lw $t1, cclist
+	beqz $t1, wclist_reset	#if cclist = 0 / reset trash of wclist 
+	
+	lw $ra, 4($sp)
+	addiu $sp, $sp, 4
+	jr $ra
+	
+wclist_reset:
+	sw $0, wclist
+	lw $ra, 4($sp)
+	addiu $sp, $sp, 4	
+	jr $ra
+err401:
+	print_error(401)
+	jr $ra
 
 #
 # FUNCION AGREGAR OBJETO
