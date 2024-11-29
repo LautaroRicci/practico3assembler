@@ -46,7 +46,7 @@ selCat: .asciiz "\nSe ha seleccionado la categoria: "
 idObj: .asciiz "\nIngrese el ID del objeto a eliminar: "
 objName: .asciiz "\nIngrese el nombre de un objeto: "
 success: .asciiz "La operación se realizo con exito\n\n"
-failure: .asciiz "La operacion NO se pudo realizar."
+failure: .asciiz "La operacion NO se pudo realizar\n\n"
 selected: .asciiz ">>"
 idSymbol: .asciiz "-> "
 thanks: .asciiz "Gracias!\n"
@@ -142,7 +142,7 @@ nextcategory:
     lw $t0, 12($t0) # cargo la direccion del nodo siguiente
    
     beq $t0, $t1, err202 	# one category print error 202
-    sw $t0, wclist 	# save wclist from register
+    sw $t0, wclist 	# actualizar wclist desde el registro $t0
     lw $t0, 8($t0) 
     imprimir_mensaje(selCat)
     la $a0, 0($t0) 	#print selected category
@@ -192,129 +192,70 @@ jr $ra
 # FUNCION LISTAR CATEGORIAS
 #
 	listcategories:
-	addi $sp, $sp, -4
-	sw $ra, 8($sp) # guardo la direccion de retorno en $sp
-	
-	lw $t0, cclist # cargo el comienzo de la lista
-	lw $t1, wclist # cargo la categoria actual
-	beqz $t0, error201 # error si no hay categorias
-	
-	lw $t1, 8($t0) # cargo la direccion del string
-	jal listcategories_loop
+				lw $t0, cclist # cargo la primer categoria
+				beqz $t0, error201 #error si no hay categorias
+				
+				lw $t1, cclist #copia para comparar
+				
+				j listcategories_loop
 	
 	listcategories_loop:
-	la $a0, ($t1) # almaceno la direccion del string en a0 para imprimir
-	li $v0, 4 # codigo para imprimir
-	syscall # imprimo lo que hay en $t1 = direccion del string 0x1004000X
-
-	addi $t1, $t1, 32 # sumo 32 para avanzar 0x20 en hexadecimal a la proxima direccion
-	move $t2, $t1 # copio la direccion sumada en 32 a $t2
-	lw $t1, 0($t1) #cargo la direccion del primero, es decir el string
-	beq $t1, $0, loopcategories_finaliza # si la direccion esta vacia, voy a loop_finaliza el cual almacena en $ra, el ra de la pila para volver a imprimir el menu
-	
-	
-	la $a0, ($t2) # cargo en $a0, la direccion del string a imprimir
-	li $v0, 4 # codigo para imprimir
-	syscall
-	
-	
-	addi $t2, $t2, 32 # vuelvo a sumar 32
-	lw $t3, 0($t2) # coloco en $t3, el string a imprimir
-	move $t1, $t2 # muevo la direccion de $t2 a $t1
-	bne $t3, $zero, listcategories_loop 
-
+				lw $t0, 8($t0) #0x10040000
+				la $a0, 0($t0) # cargo 0x10040000 en a0 para imprimir
+				li $v0, 4
+				syscall
+				
+				lw $t0, 28($t0) # accedo a 0x10040000 corrido 28 lugares (puntero a la siguiente categoria)
+				beq $t0, $t1, loopcategories_finaliza # si la siguiente categoria es igual al puntero de la primera finaliza
+				j listcategories_loop
+				
 	loopcategories_finaliza:
-	lw $ra, 8($sp) # vuelvo al $ra para terminar la ejecucion
-	jr $ra
-	
-	sumar_32:
-	addi $t1, $t1, 32
 	jr $ra
 	
 #
 # FUNCION ELIMINAR CATEGORIA
 #
 delcategory:
-addiu $sp, $sp, -4
-	sw $ra, 4($sp)		#stack pointer
-	
-	lw $t0, wclist
-	beqz $t0, err401	# no categories print error 401
-	
-	lw $t0, 4($t0)		# pointer to object list
-	beqz $t0, del_empty_cat	# empty cat delete
-	
-	lw $t1, wclist
-	la $a1, 4($t1)
-	jal del_objects_loop	# delete all objects and then category
-	
-	lw $ra, 4($sp)
-	addiu $sp, $sp, 4
-	jr $ra
-	
-	
-del_objects_loop: 
-	lw $t3, 12($t0)		# next node pointer
-	add $a0, $0, $t0	# $a0 argument for delnode
-	jal delnode
-	move $t0, $t3		# move $t3 to $t0
-	beq $a0, $t0, end_del_objects
-	j del_objects_loop
 
-end_del_objects:
-    	j del_empty_cat          
-
-del_empty_cat:
-	lw $a0, wclist	# deleted category pointer
-   	la $a1, cclist 	# pointer to list 
-   	lw $t0, 12($a0)	
-   	sw $t0, wclist     
-	jal delnode
-	
-	imprimir_mensaje(success)
-	lw $t1, cclist
-	beqz $t1, wclist_reset	#if cclist = 0 / reset trash of wclist 
-	
-	lw $ra, 4($sp)
-	addiu $sp, $sp, 4
-	jr $ra
-	
-wclist_reset:
-	sw $0, wclist
-	lw $ra, 4($sp)
-	addiu $sp, $sp, 4	
-	jr $ra
-err401:
-	imprimir_error(401)
-	jr $ra
 
 #
 # FUNCION AGREGAR OBJETO
 #
-newobject:
-	lw $t0, wclist
-	beqz $t0, err501    # no categories print error 401
-	addiu $sp, $sp, -4
-	sw $ra, 4($sp)
+newobject: 
+		lw $t0, wclist
+		beqz $t0, err501 # ERROR NO HAY CATEGORIA (RA = MENU)
+	        
+	        addiu $s4, $s4, -4
+	        sw $ra, 4($sp) # GUARDO EL RA
+	        
+	        la $a0, objName
+	        jal getblock # necesita un a0 como entrada (string de cadena) y de salida devuelve la direccion creada en v0
+	      	
+	     move $a2, $v0 # muevo la direccion del nuevo bloque creado a a2
+	     
+	     lw $a0, wclist 
 	
-	la $a0, objName
-	jal getblock		# get memory block
-	
-	move $a2, $v0
-	lw $a0, wclist
-	la $a0, 4($a0)
-	lw $t0, 0($a0)
-	beqz $t0, create_list		# if no objects create new list
-	lw $t0, 0($t0)
-	lw $t0, 4($t0)
-	addi $a1, $t0, 1		# increments the old ID 
+	     la $a0, 4($a0) # accedo a la direccion del puntero de objeto de la categoria actual
+	     lw $t0, 0($a0) # cargo el contenido de esa direccion en $t0
+
+	     beqz $t0, create_list	 # creo una nueva lista si no hay objetos
+	     lw $t0, 0($t0)
+	     lw $t0, 4($t0)
+	     addi $a1, $t0, 1	# increments the old ID 
 	
 create_node:
-	jal addnode	# add node subrutine
+	jal addnode	# agrego un nodo,  Entradas: $a0: Direccion de la categoria donde se añadira el nodo.
+				# $a1: ID.
+				# $a2: cclist del nodo
+				# Salida: $v0, direccion del nodo recien creado
+				# Tambien guarda en la posicion 4, de la categoria actual donde se ingresa el objeto, la direccion del
+				# objeto anadido
+				# Y actualiza la posicion 0 del objeto creado, con la direccion del propio objeto al igual q la posicion 12
 	lw $t0, wclist
 	la $t0, 4($t0)
-	beqz $t0, first_object		# first object link to the first pointer
 	
+	beqz $t0, first_object
+
 newobject_end:
 	li $v0, 0			# return success
 	lw $ra, 4($sp)
@@ -329,20 +270,98 @@ first_object:
 	sw $v0, 0($t0)		#store $v0 in $t0's start 
 	j newobject_end
 	
-
 err501:
 imprimir_error(501)
-j newobject_end
-		
+jr $ra
+
 #
 # FUNCION LISTAR OBJETO
 #
 listobjects:
+	lw $t1, wclist
+	beqz $t1, err601	# no hay categorias
+	
+	lw $t1, 4($t1) #0x10040030 puntero al siguiente objeto
+	beqz $t1, err602	# no hay objetos
+	
+	lw $t2, wclist # copia para comparar el primer objeto
+	lw $t2, 4($t2) #0x10040030
+	
+	j list_objectsloop
+		
+list_objectsloop:
+		lw $a0, 4($t1)
+		li $v0, 1
+		syscall
+		imprimir_mensaje(idSymbol)
+		lw $t1, 8($t1) # 0x10040020
+		la $a0, 0($t1) # cargo la direccion del string en a0 para imprimir
+		li $v0, 4
+		syscall
+		
+		lw $t1, 28($t1) # agarra el puntero al siguiente objeto
+		beq $t1, $t2,  endloop_obj # si el proximo puntero de objeto es igual a la copia del primero, termina
+		j list_objectsloop # sino vuelve a empezar
+		
+endloop_obj:
+	jr $ra
+
+err601:
+imprimir_error(201)
+jr $ra           
+
+err602:
+imprimir_error(602)
+jr $ra
 
 #
 # FUNCION ELIMINAR OBJETO
 #
 delobject:
+		addiu $sp, $sp, -4
+		sw $ra, 4($sp) #guardo el ra del menu
+
+		lw $t0, wclist
+		beqz $t0, err701	# no hay categorias
+		
+		# pido un numero y lo guardo en $v0
+		imprimir_mensaje(idObj)
+		lee_entero
+		
+		lw $t1, wclist # accedo al wclist (0x10040010)
+		lw $t1, 4($t1) # accedo a el puntero de objeto siguiente o primero (0x10040014)
+		
+		lw $t3, ($t1) #copia del primer objeto para comprobacion
+		
+		beqz $t1, err701 # no hay objetos
+		
+delobject_loop:
+		lw $t4, ($t0) # direccion del objeto (SOLO USADO EN CASO DE QUE COINCIDAN LOS IDS DE USUARIO E OBJETO)
+		
+		lw $t2, 4($t1) # accedo al id del objeto
+		
+		beq $t2, $v0, delobject_found # ID == ID USUARIO
+		lw $t1, 12($t1) # si el id del objeto no es igual al id que ingreso el usuario, $t1 se reemplaza por la direccion al objeto siguiente
+		beq $t1, $t3, errFueraRango # si la direccion de objeto siguiente es igual a la copia de la primera direccion, quiere decir que no hay mas objetos por comprobar su ID
+		
+		j delobject_loop
+
+delobject_found:
+	move $a0, $t4 # pongo el contenido de la direccion del objeto en a0
+	add $a1, $t0, 4 # al wclist le sumo 4 y lo pongo en a1
+	jal delnode
+	imprimir_mensaje(success)
+	lw $ra, 4($sp)
+	addi $sp, $sp, 4
+	jr $ra
+		
+err701:
+imprimir_error(701)
+jr $ra
+
+errFueraRango:
+imprimir_mensaje(failure)
+jr $ra
 
 ##
 ## FUNCIONES ADICIONALES
@@ -403,21 +422,23 @@ delnode_exit:
 	# a0: msg to ask
 	# v0: block address allocated with string
 getblock:
-	addi $sp, $sp, -4
-	sw $ra, 4($sp)
-	
-	li $v0, 4 # codigo para imprimir cadena, se asume que ya en a0 debe estar la cadena a imprimir
-	syscall
-	
-	jal smalloc
-	move $a0, $v0
-	li $a1, 16
-	li $v0, 8
-	syscall
-	move $v0, $a0
-	lw $ra, 4($sp)
-	addi $sp, $sp, 4
-	jr $ra
+    addi $sp, $sp, -4        # Reservar espacio en la pila
+    sw $ra, 4($sp)           # Guardar el valor de retorno en la pila
+    
+    li $v0, 4                # Preparar syscall para imprimir cadena
+    syscall                  # Imprime la cadena apuntada por $a0
+    
+    jal smalloc              # Llama a smalloc para asignar memoria
+    move $a0, $v0            # Guarda la direccion del bloque asignado en $a0
+    
+    li $a1, 16               # Establece un tamaño 16 bytes
+    li $v0, 8                # Otra syscall para ajustar el tamaño del bloque
+    syscall                  # Ejecuta la syscall
+    
+    move $v0, $a0            # Devuelve la dirección asignada en $v0
+    lw $ra, 4($sp)           # Restaurar $ra desde la pila
+    addi $sp, $sp, 4         # Liberar el espacio reservado en la pila
+    jr $ra                   # Retorna al llamador
 
 ##
 ## FUNCIONES PARA MEMORIA
