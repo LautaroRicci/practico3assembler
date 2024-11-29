@@ -252,7 +252,7 @@ del_empty_cat:
    	sw $t0, wclist     
 	jal delnode
 	
-	print_label(success)
+	imprimir_mensaje(success)
 	lw $t1, cclist
 	beqz $t1, wclist_reset	#if cclist = 0 / reset trash of wclist 
 	
@@ -266,7 +266,7 @@ wclist_reset:
 	addiu $sp, $sp, 4	
 	jr $ra
 err401:
-	print_error(401)
+	imprimir_error(401)
 	jr $ra
 
 #
