@@ -387,7 +387,7 @@ delobject:
 		beqz $t1, err701 # no hay objetos
 		
 delobject_loop:
-		lw $t4, ($t0) # direccion del objeto (SOLO USADO EN CASO DE QUE COINCIDAN LOS IDS DE USUARIO E OBJETO)
+		lw $t4, ($t1) # direccion del objeto (SOLO USADO EN CASO DE QUE COINCIDAN LOS IDS DE USUARIO E OBJETO)
 		
 		lw $t2, 4($t1) # accedo al id del objeto
 		
